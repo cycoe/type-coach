@@ -1,6 +1,4 @@
-#include <ncurses.h>
-#include <wchar.h>
-
+#include "windows.h"
 #include "utils.h"
 
 int popup_alt(WINDOW *win, const wchar_t *title, const wchar_t *content,
@@ -46,62 +44,75 @@ int popup_alt(WINDOW *win, const wchar_t *title, const wchar_t *content,
   }
 }
 
-int popup_list(WINDOW *win, const wchar_t *title, const wchar_t *list[],
-               unsigned nitem, unsigned default_) {
+int update_popup_list(WINDOW *win, const wchar_t *title, const wchar_t *content,
+                      wchar_t **list, unsigned nitem, unsigned default_,
+                      int ntop, int ndisplay) {
 
   int width = getmaxx(win);
   int height = getmaxy(win);
 
-  /* draw title */
-  wattron(win, A_BOLD);
-  mvwprintw(win, 1, (width - wstrwidth(title)) >> 1, "%ls", title);
-  wattroff(win, A_BOLD);
-
-  /* draw list */
-  for (int n = 0; n < nitem; n++) {
-    if (n == default_)
-      wattron(win, A_REVERSE);
-    mvwprintw(win, 3 + n, 1, "%d. %ls", n + 1, list[n]);
-    wattroff(win, A_REVERSE);
-  }
+  wclear(win);
 
   /* draw borders */
   box(win, 0, 0);
+  mvwprintw(win, 0, (width - wstrwidth(title)) >> 1, "%ls", title);
 
-  /* refresh window */
+  /* draw title */
+  wattron(win, A_BOLD);
+  mvwprintw(win, 1, (width - wstrwidth(content)) >> 1, "%ls", content);
+  wattroff(win, A_BOLD);
+
+  /* draw list */
+  for (int n = ntop; n < ntop + ndisplay && n < nitem; n++) {
+    if (n == default_)
+      wattron(win, A_REVERSE);
+    mvwprintw(win, 3 + n - ntop, 1, "%d. %ls", n + 1, list[n]);
+    wattroff(win, A_REVERSE);
+  }
+
   wrefresh(win);
 
-  keypad(stdscr, 1);
-  /* handle input */
+  return 1;
+}
+
+int popup_list(WINDOW *win, const wchar_t *title, const wchar_t *content,
+              wchar_t *list[], unsigned nitem, unsigned default_) {
+
+  int height = getmaxy(win);
+  int width = getmaxx(win);
+  int ntop = 0, ndisplay = height - 4;
   int ch;
+
+  keypad(win, TRUE);
+
+  update_popup_list(win, title, content, list, nitem, default_, ntop, ndisplay);
+
+  /* handle input */
   while ((ch = getch())) {
     switch (ch) {
     case KEY_UP:
     case 'k':
       if (default_ > 0) {
-        mvwprintw(win, 3 + default_, 1, "%d. %ls", default_ + 1,
-                  list[default_]);
         default_--;
-        wattron(win, A_REVERSE);
-        mvwprintw(win, 3 + default_, 1, "%d. %ls", default_ + 1,
-                  list[default_]);
-        wattroff(win, A_REVERSE);
-        wrefresh(win);
+        if (default_ < ntop) {
+          ntop = default_;
+        }
+        update_popup_list(win, title, content, list, nitem, default_, ntop,
+                          ndisplay);
       }
       break;
     case KEY_DOWN:
     case 'j':
       if (default_ < nitem - 1) {
-        mvwprintw(win, 3 + default_, 1, "%d. %ls", default_ + 1,
-                  list[default_]);
         default_++;
-        wattron(win, A_REVERSE);
-        mvwprintw(win, 3 + default_, 1, "%d. %ls", default_ + 1,
-                  list[default_]);
-        wattroff(win, A_REVERSE);
-        wrefresh(win);
+        if (default_ >= ntop + ndisplay) {
+          ntop = default_ - ndisplay + 1;
+        }
+        update_popup_list(win, title, content, list, nitem, default_, ntop,
+                          ndisplay);
       }
       break;
+    case 'l':
     case KEY_ENTER:
     case KEY_RIGHT:
       return default_;
