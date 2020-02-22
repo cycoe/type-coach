@@ -1,4 +1,4 @@
-TARGET = trainner
+TARGET = coach
 SRC = $(wildcard *.c)
 OBJ = ${SRC:.c=.o}
 

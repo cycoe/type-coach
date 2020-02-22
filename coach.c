@@ -47,7 +47,7 @@ typedef struct STAT {
 #define DICT_PATH "dicts/cangjie6.dict.yaml"
 #define WORD_PATH "dicts/cangjie6.extsimp.dict.yaml"
 #define ARTICLE_DIR "articles/"
-#define TITLE_MAIN L"仓颉输入法训练器"
+#define TITLE_MAIN L"蒼頡檢字法訓練器"
 #define TITLE_PANEL L"数据统计"
 #define TITLE_KEYBOARD L"键盘提示"
 
@@ -248,12 +248,17 @@ char *get_head(const char *code, char *rcode) {
 }
 
 char *get_tail(const char *code, char *rcode) {
+  char *quot;
   unsigned code_len;
 
   code_len = strlen(code);
 
   memset(rcode, 0, 2);
-  rcode[0] = code[code_len - 1];
+  if ((quot = strchr(code, '\''))) {
+    rcode[0] = *(quot - 1);
+  } else {
+    rcode[0] = code[code_len - 1];
+  }
 
   return rcode;
 }
@@ -268,8 +273,10 @@ char *get_head_tail(const char *code, char *rcode) {
   rcode[0] = code[0];
 
   if ((quot = strchr(code, '\''))) {
-    /* 如果编码中有 `'`，则编码长度至少为 3，取 `'` 前的字符为尾 */
-    rcode[1] = *(quot - 1);
+    if (quot - code > 1)
+      rcode[1] = *(quot - 1);
+    else
+      rcode[1] = code[code_len - 1];
   } else if (code_len > 1) {
     rcode[1] = code[code_len - 1];
   }
@@ -519,8 +526,8 @@ int draw_border(WINDOW *win, const SIZE *win_size, const wchar_t *title) {
   box(win, 0, 0);
 
   if (title) {
-    title_width = wstrwidth(title);
-    mvwprintw(win, 0, (win_size->width - title_width) / 2 + 1, "[%ls]", title);
+    title_width = wstrwidth(title) + 2;
+    mvwprintw(win, 0, (win_size->width - title_width) / 2, "[%ls]", title);
   }
 
   wrefresh(win);
@@ -862,7 +869,8 @@ int init_ui(WINDOW *main_win, SIZE *main_size, WINDOW *panel_win, SIZE *panel_si
   return 1;
 }
 
-void *stat_by_time(void *arg) { STAT *stat = (STAT *)arg;
+void *stat_by_time(void *arg) {
+  STAT *stat = (STAT *)arg;
   time_t now;
   unsigned cursory, cursorx;
   int time_spend;
@@ -876,9 +884,9 @@ void *stat_by_time(void *arg) { STAT *stat = (STAT *)arg;
     mvwprintw(stat->panel_win, 2, 2, "%ls      %d", L"总用时", time_spend);
     mvwprintw(stat->panel_win, 6, 2, "%ls    %d", L"输入速度",
               stat->nchar * 60 / (time_spend + 1));
-    wrefresh(stat->panel_win);
 
     wmove(stat->main_win, cursory, cursorx);
+    wrefresh(stat->panel_win);
     wrefresh(stat->main_win);
 
     sleep(1);
